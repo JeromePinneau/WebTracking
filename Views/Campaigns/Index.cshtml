@@ -1,0 +1,37 @@
+﻿@model List<Webtracking.Models.CampaignList>
+
+@{
+    ViewData["Title"] = "ViewCampaign";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h1>Campaign management</h1>
+
+<p>
+    <a asp-action="Create">Create New</a>
+</p>
+<table class="table">
+    <thead>
+        <tr>
+            <th>Campaign</th>
+            <th>Openers</th>
+            <th>Clickers</th>
+            <th>Unsubscriptions</th>
+        </tr>
+    </thead>
+    <tbody>
+@foreach (var item in Model) {
+        <tr>
+            <td>
+                <span title="click on the name to show statistics">@Html.ActionLink(@item.Name, "Details", new { id = item._id })</span>
+            </td>
+            <td>@item.Openers ( @item.OpenersRate % )</td>
+            <td>@item.Clickers  ( @item.ClickersRate % )</td>
+            <td>@item.Unsubscriptions ( @item.UnsubscriptionsRate % )</td>
+            <td>
+                @Html.ActionLink("Edit", "Edit", new { id = item._id }) |
+                @Html.ActionLink("Delete", "Delete", new { id = item._id  })
+            </td>
+        </tr>}
+    </tbody>
+</table>
