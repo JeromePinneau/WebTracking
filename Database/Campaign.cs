@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.ComponentModel.DataAnnotations;
 using Org.BouncyCastle.Asn1.Crmf;
 using System.Data;
+using Microsoft.Extensions.Logging;
 
 namespace Webtracking.Database
 {
@@ -114,20 +115,21 @@ namespace Webtracking.Database
             while (oReader.Read())
             {
                 Models.CampaignList newInstance = new Models.CampaignList(){ _id = oReader["_id"].ToString(), Name = oReader["Name"].ToString()};
-                string subRequest = string.Format("SELECT c._id,c.EmailSent, COUNT(z.IsOpener) as Openers, COUNT(z2.IsClicker) as Clickers, COUNT(z2.IsUnsubscribe) as Unsubscribe  FROM campaign c left outer join z{0} z on z.IdCampaign = c._id and z.IsOpener = 1 left outer join z{0} z1 on z1.IdCampaign = c._id and z1.IsClicker = 1 left outer join z{0} z2 on z2.IdCampaign = c._id and z2.IsUnsubscribe = 1 WHERE c._id = @_id", oReader["Name"].ToString());
+                string subRequest = string.Format("SELECT c._id,c.EmailSent, SUM(z.IsOpener) as Openers, SUM(z.IsClicker) as Clickers, SUM(z.IsUnsubscribe) as Unsubscribe  FROM campaign c left outer join z{0} z on z.IdCampaign = c._id and z.IsOpener = 1 WHERE c._id = @_id GROUP BY c._id,c.EmailSent;", oReader["Name"].ToString());
                 MySqlCommand oCom2 = new MySqlCommand(subRequest, Database.DataBase.Connection,null);
                 oCom2.Parameters.Add("_id", MySqlDbType.VarChar);
                 oCom2.Parameters["_id"].Value = oReader["_id"].ToString();
                 MySqlDataReader oReader2 = oCom2.ExecuteReader(System.Data.CommandBehavior.SingleRow);
                 if (oReader2.Read())
                 {
+                    int NbSent = Convert.ToInt32(oReader["EmailSent"]);
                     newInstance.Openers = Convert.ToInt32(oReader2["Openers"]);
-                    newInstance.OpenersRate = (Convert.ToInt32(oReader["EmailSent"])>0)?(Convert.ToInt32(oReader2["Openers"]) / Convert.ToInt32(oReader["EmailSent"])) * 100:0;
+                    newInstance.OpenersRate = (NbSent > 0)?(((float)newInstance.Openers / (float)NbSent) * 100):300;
                     newInstance.Clickers = Convert.ToInt32(oReader2["Clickers"]);
-                    newInstance.OpenersRate = (Convert.ToInt32(oReader2["Openers"])>0)?(Convert.ToInt32(oReader2["Clickers"]) / Convert.ToInt32(oReader2["Openers"])) * 100:0;
+                    newInstance.ClickersRate = (newInstance.Openers > 0)?(((float)newInstance.Clickers / (float)newInstance.Openers) * 100):300;
                     newInstance.Unsubscriptions = Convert.ToInt32(oReader2["Unsubscribe"]);
-                    newInstance.UnsubscriptionsRate = (Convert.ToInt32(oReader2["Clickers"])>0)?(Convert.ToInt32(oReader2["Unsubscribe"]) / Convert.ToInt32(oReader2["Clickers"])) * 100:0;
-                    newInstance.EmailSent = Convert.ToInt32(oReader["EmailSent"]);
+                    newInstance.UnsubscriptionsRate = (newInstance.Clickers > 0)?(((float)newInstance.Unsubscriptions / (float)newInstance.Clickers) * 100):0;
+                    newInstance.EmailSent = NbSent;
                 }
                 else
                 {
@@ -197,7 +199,7 @@ namespace Webtracking.Database
                     }
                     try
                     {
-                        oCom.CommandText = string.Format("CREATE TABLE `z{0}link` (`Receipient` VARCHAR(300) NOT NULL, `IdCampaign` VARCHAR(50) NOT NULL, `IdLink` INT NOT NULL,`NbClick` INT NULL DEFAULT 0,`FirstClickDate` BIT NULL DEFAULT 0, PRIMARY KEY(`Receipient`, `IdLink`)); ", Name);
+                        oCom.CommandText = string.Format("CREATE TABLE `z{0}link` (`Receipient` VARCHAR(300) NOT NULL, `IdCampaign` VARCHAR(50) NOT NULL, `IdLink` INT NOT NULL,`NbClick` INT NULL DEFAULT 0,`FirstClickDate` datetime NULL, PRIMARY KEY(`Receipient`, `IdLink`)); ", Name);
                         oCom.ExecuteNonQuery();
                     }
                     catch (Exception ex)
@@ -249,6 +251,8 @@ namespace Webtracking.Database
                 oCom.Parameters["_id"].Value = _id;
                 oCom.CommandText = "DELETE FROM campaign WHERE _id=@_id;";
                 oCom.ExecuteNonQuery();
+                oCom.CommandText = "DELETE FROM link WHERE IdCampaign=@_id;";
+                oCom.ExecuteNonQuery();
                 oCom.CommandText = string.Format("DROP TABLE `z{0}`;", this.Name);
                 oCom.ExecuteNonQuery();
                 oCom.CommandText = string.Format("DROP TABLE `z{0}link`;", this.Name);
@@ -265,17 +269,160 @@ namespace Webtracking.Database
             return success;
         }
 
+        public static bool LogOpener(string oReceipient, string oIdCampaign)
+        {
+            bool success = true;
+            MySqlCommand oCom = new MySqlCommand(String.Empty, DataBase.Connection, null);
+            Campaign oCampaign = new Campaign(new Guid(oIdCampaign));
+            try
+            {
+                oCom.Parameters.Add("Receipient", MySqlDbType.String);
+                oCom.Parameters["Receipient"].Value = oReceipient;
+                oCom.Parameters.Add("IdCampaign", MySqlDbType.String);
+                oCom.Parameters["IdCampaign"].Value = oIdCampaign;
+                oCom.CommandText = string.Format("SELECT count(*) FROM z{0} WHERE Receipient=@Receipient AND IdCampaign=@IdCampaign", oCampaign.Name);
+                if (Convert.ToInt32(oCom.ExecuteScalar()) == 0)
+                {
+                    MySqlCommand oCom2 = new MySqlCommand(string.Format("INSERT INTO z{0} (Receipient,IdCampaign,IsOpener,IsClicker,IsHardBounce,IsUnsubscribe,FirstOpenerDate,FirstClickerDate,FirstUnsubscriptionDate)" +
+                        " VALUES (@Receipient,@IdCampaign,1,0,0,0,NOW(),null,null);", oCampaign.Name), DataBase.Connection, null);
+
+                    oCom2.Parameters.Add("Receipient", MySqlDbType.String);
+                    oCom2.Parameters["Receipient"].Value = oReceipient;
+                    oCom2.Parameters.Add("IdCampaign", MySqlDbType.String);
+                    oCom2.Parameters["IdCampaign"].Value = oIdCampaign;
+                    oCom2.ExecuteNonQuery();
+                    oCom2.Dispose();
+                }
+            }
+            catch(Exception ex)
+            {
+                success = false;
+            }
+            finally
+            {
+                oCom.Dispose();
+            }
+            return success;
+        }
+
+        public static bool LogClicker(string oReceipient, string oIdCampaign)
+        {
+            bool success = true;
+            MySqlCommand oCom = new MySqlCommand(String.Empty, DataBase.Connection, null);
+            Campaign oCampaign = new Campaign(new Guid(oIdCampaign));
+            // log opener (To click, it's necessary to open
+            LogOpener(oReceipient, oCampaign._id.ToString());
+            try
+            {
+                oCom.Parameters.Add("Receipient", MySqlDbType.String);
+                oCom.Parameters["Receipient"].Value = oReceipient;
+                oCom.Parameters.Add("IdCampaign", MySqlDbType.String);
+                oCom.Parameters["IdCampaign"].Value = oIdCampaign;
+                oCom.CommandText = string.Format("SELECT count(*) FROM z{0} WHERE Receipient=@Receipient AND IdCampaign=@IdCampaign AND IsClicker=1", oCampaign.Name);
+                if (Convert.ToInt32(oCom.ExecuteScalar()) == 0)
+                {
+                    oCom.CommandText = string.Format("UPDATE z{0} SET IsClicker=1, FirstClickerDate=NOW() WHERE Receipient=@Receipient AND IdCampaign=@IdCampaign", oCampaign.Name);
+                    oCom.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                success = false;
+            }
+            finally
+            {
+                oCom.Dispose();
+            }
+            return success;
+        }
+
+        public static bool LogUnsubscribe(string oReceipient, string oIdCampaign)
+        {
+            bool success = true;
+            MySqlCommand oCom = new MySqlCommand(String.Empty, DataBase.Connection, null);
+            Campaign oCampaign = new Campaign(new Guid(oIdCampaign));
+            // log opener (To click, it's necessary to open
+            LogOpener(oReceipient, oCampaign._id.ToString());
+            try
+            {
+                oCom.Parameters.Add("Receipient", MySqlDbType.String);
+                oCom.Parameters["Receipient"].Value = oReceipient;
+                oCom.Parameters.Add("IdCampaign", MySqlDbType.String);
+                oCom.Parameters["IdCampaign"].Value = oIdCampaign;
+                oCom.CommandText = string.Format("SELECT count(*) FROM z{0} WHERE Receipient=@Receipient AND IdCampaign=@IdCampaign AND IsUnsubscribe=1", oCampaign.Name);
+                if (Convert.ToInt32(oCom.ExecuteScalar()) == 0)
+                {
+                    oCom.CommandText = string.Format("UPDATE z{0} SET IsUnsubscribe=1, FirstUnsubscriptionDate=NOW() WHERE Receipient=@Receipient AND IdCampaign=@IdCampaign", oCampaign.Name);
+                    oCom.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                success = false;
+            }
+            finally
+            {
+                oCom.Dispose();
+            }
+            return success;
+        }
+
+        public static string GetTrackedLink(int id, string Receipient)
+        {
+            string returnedlink = string.Empty;
+            MySqlCommand oCom = new MySqlCommand(String.Empty, DataBase.Connection, null);
+            try
+            {
+                oCom.Parameters.Add("_id", MySqlDbType.Int32);
+                oCom.Parameters["_id"].Value = id;
+                oCom.CommandText = "SELECT IdCampaign, Link FROM link WHERE _id=@_id;";
+                MySqlDataReader oReader = oCom.ExecuteReader(CommandBehavior.SingleRow);
+                if (oReader.Read())
+                {
+                    returnedlink = oReader["Link"].ToString();
+                    // save the track.
+                    Campaign oCampaign = new Campaign(new Guid(oReader["IdCampaign"].ToString()));
+                    LogClicker(Receipient, oCampaign._id.ToString());
+                    // Find if this opener is already loged or not.
+                    MySqlCommand oCom2 = new MySqlCommand(string.Format("SELECT count(*) FROM z{0}link WHERE Receipient=@Receipient AND IdLink=@IdLink AND IdCampaign=@IdCampaign;", oCampaign.Name), DataBase.Connection, null);
+                    oCom2.Parameters.Add("IdLink", MySqlDbType.Int32);
+                    oCom2.Parameters["IdLink"].Value = id;
+                    oCom2.Parameters.Add("IdCampaign", MySqlDbType.String);
+                    oCom2.Parameters["IdCampaign"].Value = oCampaign._id.ToString();
+                    oCom2.Parameters.Add("Receipient", MySqlDbType.String);
+                    oCom2.Parameters["Receipient"].Value = Receipient;
+                    if (Convert.ToInt32(oCom2.ExecuteScalar()) == 0)
+                    {
+                        oCom2.CommandText = string.Format("INSERT INTO z{0}link (Receipient,IdCampaign,IdLink,NbClick,FirstClickDate) VALUES (@Receipient,@IdCampaign,@IdLink,1,NOW());", oCampaign.Name);
+                        oCom2.ExecuteNonQuery();
+                    }
+                    else
+                    {
+                        oCom2.CommandText = string.Format("SELECT NbClick FROM z{0}link WHERE Receipient=@Receipient AND IdLink=@IdLink AND IdCampaign=@IdCampaign;", oCampaign.Name);
+                        int Cpt = Convert.ToInt32(oCom2.ExecuteScalar());
+                        oCom2.Parameters.Add("NbClick", MySqlDbType.Int32);
+                        oCom2.Parameters["NbClick"].Value = (Cpt+1);
+                        oCom2.CommandText = string.Format("UPDATE z{0}link SET NbClick=@NbClick WHERE Receipient=@Receipient AND IdLink=@IdLink AND IdCampaign=@IdCampaign;", oCampaign.Name);
+                        oCom2.ExecuteNonQuery();
+                    }
+                }
+                else
+                    throw new Exception("Fatal error: Link not found!");
+            }
+            catch (Exception ex)
+            {
+            }
+            finally
+            {
+                oCom.Dispose();
+            }
+            return returnedlink;
+        }
+
         public static string TrackContent(string body, string domain, string dynamicEmailField, bool saveBat, string campaign, string oIdCampaign)
         {
+            Campaign oCampaign = new Campaign(new Guid(oIdCampaign));
             string newcontent = body;
-            // Save Original body
-            if (saveBat)
-            {
-                StreamWriter oWriter3 = new StreamWriter(System.IO.Path.Combine(Middleware.GlobalSetting.GetSettings().MapathBat, string.Format("{0}.html", campaign)), false, System.Text.Encoding.UTF8);
-                oWriter3.Write(body);
-                oWriter3.Close();
-                oWriter3.Dispose();
-            }
             // Track content
             Regex oreg = new Regex(@"href\s*=\s*(?:""(?<1>[^""]*)""|(?<1>\S+))");
             MatchCollection Result = oreg.Matches(body);
@@ -294,11 +441,21 @@ namespace Webtracking.Database
                 }
                 foreach(string okey in oNewLink.Keys)
                 {
-                    string newlink = string.Format(Middleware.GlobalSetting.GetSettings().LinkBuilModel, domain, Guid.NewGuid().ToString("d").Substring(1, Middleware.GlobalSetting.GetSettings().CharsOnelink), dynamicEmailField, TrackLink(oIdCampaign, okey).ToString());
+                    string newlink = string.Format("https://{0}/Actions/o/{2}/?key={1}", domain,dynamicEmailField, TrackLink(oIdCampaign, okey).ToString());
                     newcontent = newcontent.Replace(okey, newlink);
                 }
             }
-            return newcontent;
+            string endcontent = string.Empty;
+            int endbodyposition = newcontent.ToLower().IndexOf("</body>");
+            // Add img before /body or at the end
+            if (endbodyposition > 0)
+            {
+                endcontent = newcontent.Substring(0, endbodyposition-1);
+                endcontent = string.Concat(endcontent,string.Format("<img src=\"https://{0}/Actions/op/{1}/?key={2}\" />", oCampaign.Domain, oIdCampaign, dynamicEmailField), newcontent.Substring(endbodyposition, (newcontent.Length - (endbodyposition))));
+            }
+            else
+                endcontent = string.Concat(newcontent, string.Format("<img src=\"https://{0}/Actions/op/{1}/?key={2}\" />", oCampaign.Domain, oIdCampaign, dynamicEmailField), newcontent);
+            return endcontent;
         }
 
         private static int TrackLink(string campaign, string finalLink)

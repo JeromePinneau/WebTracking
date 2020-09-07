@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Hosting.Server.Features;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Webtracking.Database;
@@ -69,11 +70,14 @@ namespace Webtracking.Controllers
 
         public IActionResult Create(Database.Campaign newCampaign)
         {
-            if(string.IsNullOrEmpty(newCampaign.Name))
+            if (string.IsNullOrEmpty(newCampaign.Name))
+            {
+                newCampaign.Domain = this.Request.HttpContext.Request.Host.ToString();
                 return View(newCampaign);
+            }
             else
             {
-                if(newCampaign.Save())
+                if (newCampaign.Save())
                     return RedirectToAction("Index");
                 else
                     return View(newCampaign);

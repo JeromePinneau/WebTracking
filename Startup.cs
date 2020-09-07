@@ -9,6 +9,9 @@ using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Serilog.Extensions.Logging;
+using Microsoft.Extensions.Logging;
+using System.ComponentModel;
 
 namespace Webtracking
 {
@@ -28,7 +31,7 @@ namespace Webtracking
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
+        public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
             if (env.IsDevelopment())
             {
@@ -41,11 +44,13 @@ namespace Webtracking
                 app.UseHsts();
             }
 
-
             var builder = new ConfigurationBuilder()
                 .SetBasePath(env.ContentRootPath)
                 .AddJsonFile("appsettings.json");
             Configuration = builder.Build();
+
+            //init log 
+            loggerFactory.AddFile(GlobalSetting.GetSettings().LogFilePath);
 
             app.UseMyMiddleware();
             app.UseHttpsRedirection();

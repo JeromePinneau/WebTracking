@@ -9,11 +9,8 @@ namespace Webtracking.Middleware
     public class GlobalSetting
     {
         public string ConnectionString { get; set; }
-        public string MapathBat { get; set; }
 
-        public int CharsOnelink { get; set; }
-
-        public string LinkBuilModel { get; set; }
+        public string LogFilePath { get; set; }
 
         public static GlobalSetting GetSettings()
         {

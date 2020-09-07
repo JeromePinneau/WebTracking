@@ -23,7 +23,7 @@
 @foreach (var item in Model) {
         <tr>
             <td>
-                <span title="click on the name to show statistics">@Html.ActionLink(@item.Name, "Details", new { id = item._id })</span>
+                <span title="click on the name to show statistics">@Html.ActionLink(@item.Name, "Details", new { id = item._id }) ( @item.EmailSent )</span>
             </td>
             <td>@item.Openers ( @item.OpenersRate % )</td>
             <td>@item.Clickers  ( @item.ClickersRate % )</td>

@@ -16,8 +16,7 @@ namespace Webtracking.Middleware
         public async Task Invoke(HttpContext context)
         {
             string[] UrlParameter = context.Request.Path.Value.Split('/');
-            var EmailQuery = context.Request.Query["culture"];
-            if (!string.IsNullOrWhiteSpace(EmailQuery))
+            if (UrlParameter.Length==6)
             {
 
             }
