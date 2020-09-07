@@ -29,8 +29,9 @@
             <td>@item.Clickers  ( @item.ClickersRate % )</td>
             <td>@item.Unsubscriptions ( @item.UnsubscriptionsRate % )</td>
             <td>
+                @Html.ActionLink("Tracker", "Tracker", new { id = item._id }) |
                 @Html.ActionLink("Edit", "Edit", new { id = item._id }) |
-                @Html.ActionLink("Delete", "Delete", new { id = item._id  })
+                @Html.ActionLink("Delete", "Delete", new { id = item._id }, new { onclick = "return confirm('Remove a campaign will remove definitivly the campaign AND all its statistics. Are you sure that you want remove it?');" })
             </td>
         </tr>}
     </tbody>

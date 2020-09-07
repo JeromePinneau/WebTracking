@@ -5,12 +5,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Webtracking.Database;
 using Webtracking.Models;
 
 namespace Webtracking.Controllers
 {
     public class CampaignsController : Controller
     {
+        //TODO: manage the "Edit" a button of a campaign in the controler and the campaign management view
+        //TODO: Create the view "details" to consult the statistics of a campaign (the view exist but not implemented).
+
         private readonly ILogger<CampaignsController> _logger;
 
         public CampaignsController(ILogger<CampaignsController> logger)
@@ -18,14 +22,27 @@ namespace Webtracking.Controllers
             _logger = logger;
         }
 
-        public IActionResult Edit()
+        public IActionResult Edit(string id)
         {
-            return View(new Database.Campaign());
+            return View(new Database.Campaign(new Guid(id)));
         }
 
-        public IActionResult Details()
+        public IActionResult Delete(string id)
         {
-            return View(new Database.Campaign());
+            Campaign oCamp = new Campaign(new Guid(id));
+            oCamp.Remove();
+            return RedirectToAction("Index"); 
+        }
+
+        [HttpPost]
+        public IActionResult Edit(Database.Campaign oCampaign)
+        {
+            return View(oCampaign);
+        }
+
+        public IActionResult Details(string id)
+        {
+            return View(new Database.Campaign(new Guid(id)));
         }
 
         public IActionResult Index()
@@ -33,11 +50,22 @@ namespace Webtracking.Controllers
             return View(Database.Campaign.GetListWStats());
         }
 
-        /*
-        public IActionResult Create()
+        [HttpGet]
+        public IActionResult Tracker(string? id)
         {
-            return View(new Database.Campaign());
-        }*/
+            return View(new Database.Campaign(new Guid(id)));
+        }
+
+        [HttpPost]
+        public IActionResult Tracker(string? id, Database.Campaign model)
+        {
+            if (!String.IsNullOrEmpty(model.OriginalBat))
+            {
+                model.TrackedBat = Campaign.TrackContent(model.OriginalBat, model.Domain, model.DynamicField, true, model.Name, model._id);
+                model.Save();
+            }
+            return RedirectToAction("Tracker", new { id = model._id });
+        }
 
         public IActionResult Create(Database.Campaign newCampaign)
         {

@@ -1,0 +1,54 @@
+﻿@model Webtracking.Database.Campaign
+
+@{
+    ViewData["Title"] = "Tracker";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<h1>Bat Tracker</h1>
+
+<div>
+    <h4><label asp-for="Name"></label>&nbsp;&nbsp;@Html.DisplayFor(model => model.Name)</h4>
+    <hr />
+    <form asp-route-returnUrl="@ViewData["ReturnUrl"]" method="post">
+        @Html.HiddenFor(m => m._id)
+        @Html.HiddenFor(m => m.CreationDate)
+        @Html.HiddenFor(m => m.EmailSent)
+        @Html.HiddenFor(m => m.UpdatedDate)
+        @Html.HiddenFor(m => m.Name)
+        <div class="row">
+            <div class="col-md-3">
+                <label asp-for="Domain" class="custom-control-label"></label>
+            </div>
+            <div class="col-md-3">
+                <input asp-for="Domain" />
+                <span asp-validation-for="Domain" class="custom-valisation"></span>
+            </div>
+            <div class="col-md-3">
+                <label asp-for="DynamicField" class="custom-control-label"></label>
+            </div>
+            <div class="col-md-3">
+                <input asp-for="DynamicField" />
+                <span asp-validation-for="DynamicField" class="custom-valisation"></span>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6">
+                <label asp-for="OriginalBat" class="custom-control-label"></label>
+            </div>
+            <div class="col-md-6">
+                <label asp-for="TrackedBat" class="custom-control-label"></label>
+            </div>
+            <div class="col-md-6">
+                <textarea asp-for="OriginalBat" cols="60" style="height: 400px;"></textarea>
+                <span asp-validation-for="OriginalBat" class="custom-valisation"></span>
+            </div>
+            <div class="col-md-6">
+                <textarea asp-for="TrackedBat" cols="60" style="height: 400px;"></textarea>
+            </div>
+            <div class="row">
+                <button type="submit" onclick="return confirm('the BAT\'s tracking replaces its predecessor for the same campaign. Would you like to track this BAT? ');" class="btn btn-success">Register</button>&nbsp;&nbsp;<a class="btn btn-danger" asp-action="Index">Cancel and back to List</a>
+            </div>
+        </div>
+    </form>
+</div>

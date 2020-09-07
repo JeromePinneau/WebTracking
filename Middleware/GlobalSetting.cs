@@ -13,6 +13,8 @@ namespace Webtracking.Middleware
 
         public int CharsOnelink { get; set; }
 
+        public string LinkBuilModel { get; set; }
+
         public static GlobalSetting GetSettings()
         {
             GlobalSetting Setting = new GlobalSetting();

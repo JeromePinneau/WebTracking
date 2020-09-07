@@ -4,15 +4,18 @@ using System;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.ComponentModel.DataAnnotations;
+using Org.BouncyCastle.Asn1.Crmf;
+using System.Data;
 
 namespace Webtracking.Database
 {
 
     public class Campaign
     {
-        public string _id;
+        public string _id { get; set; }
 
         public DateTime CreationDate { get; set; }
+
         public DateTime UpdatedDate { get; set; }
 
         [StringLength(45)]
@@ -34,8 +37,60 @@ namespace Webtracking.Database
         [StringLength(255)]
         [DataType(DataType.Text)]
         [Required(ErrorMessage = "Dynamic field is requisites")]
-        [Display(Name = "Dynamic field for email")]
+        [Display(Name = "Email tag")]
         public string DynamicField { get; set; }
+
+        [DataType(DataType.MultilineText)]
+        [Display(Name = "Original BAT")]
+        public string OriginalBat { get; set; }
+
+        [DataType(DataType.MultilineText)]
+        [Display(Name = "Tracked BAT")]
+        public string TrackedBat { get; set; }
+
+        /// <summary>
+        /// Default constructor to create new campaign
+        /// </summary>
+        public Campaign(){}
+
+        /// <summary>
+        /// Get instance from database by Id
+        /// </summary>
+        /// <param name="oid">Guid of the campaign</param>
+        public Campaign(Guid oid)
+        {
+            MySqlDataReader oReader = null;
+            try
+            {
+                MySqlCommand oCom = new MySqlCommand(String.Empty, DataBase.Connection, null);
+                oCom.Parameters.Add("_id", MySqlDbType.String);
+                oCom.Parameters["_id"].Value = oid.ToString();
+                oCom.CommandText = "SELECT * FROM campaign WHERE _id = @_id;";                
+                oReader = oCom.ExecuteReader(CommandBehavior.SingleRow);
+                if (oReader.Read())
+                {
+                    this._id = oReader["_id"].ToString();
+                    this.Name = oReader["Name"].ToString();
+                    this.EmailSent = Convert.ToInt32(oReader["EmailSent"]);
+                    this.Domain = oReader["Domain"].ToString();
+                    this.DynamicField = oReader["DynamicField"].ToString();
+                    this.CreationDate = Convert.ToDateTime(oReader["CreationDate"]);
+                    this.UpdatedDate = Convert.ToDateTime(oReader["UpdatedDate"]);
+                    this.OriginalBat = oReader["OriginalBat"].ToString();
+                    this.TrackedBat = oReader["TrackedBat"].ToString();
+                }
+                oReader.Close();
+            }
+            catch (Exception ex)
+            {
+                if (oReader != null)
+                    oReader.Close();
+                throw ex;
+            }
+            finally { 
+            
+            }
+        }
 
         public static List<Campaign> GetAll()
         {
@@ -60,7 +115,7 @@ namespace Webtracking.Database
             {
                 Models.CampaignList newInstance = new Models.CampaignList(){ _id = oReader["_id"].ToString(), Name = oReader["Name"].ToString()};
                 string subRequest = string.Format("SELECT c._id,c.EmailSent, COUNT(z.IsOpener) as Openers, COUNT(z2.IsClicker) as Clickers, COUNT(z2.IsUnsubscribe) as Unsubscribe  FROM campaign c left outer join z{0} z on z.IdCampaign = c._id and z.IsOpener = 1 left outer join z{0} z1 on z1.IdCampaign = c._id and z1.IsClicker = 1 left outer join z{0} z2 on z2.IdCampaign = c._id and z2.IsUnsubscribe = 1 WHERE c._id = @_id", oReader["Name"].ToString());
-                MySqlCommand oCom2 = new MySqlCommand(subRequest, Database.DataBase.subConnection,null);
+                MySqlCommand oCom2 = new MySqlCommand(subRequest, Database.DataBase.Connection,null);
                 oCom2.Parameters.Add("_id", MySqlDbType.VarChar);
                 oCom2.Parameters["_id"].Value = oReader["_id"].ToString();
                 MySqlDataReader oReader2 = oCom2.ExecuteReader(System.Data.CommandBehavior.SingleRow);
@@ -84,15 +139,21 @@ namespace Webtracking.Database
                 oReader2.Close();
                 oList.Add(newInstance);
             }
-            Database.DataBase.subConnection.Close();
             oReader.Close();
             return oList;
         }
 
+        /// <summary>
+        /// Object serialisation in the database (Update or Insert if _id is null)
+        /// </summary>
+        /// <returns>true if sucess</returns>
         public bool Save()
         {
             if (!System.Text.RegularExpressions.Regex.IsMatch(Name, "^[0-9A-Za-z ]+$"))
                 throw new Exception("Campaign's name is not valid!");
+
+            //TODO : Do a check if the "name" is available for this _id (because the campaign's Name need to be unique, there is already an unique index on it in the database.
+
             bool insertMode = false;
             bool success = false;
             MySqlCommand oCom = new MySqlCommand(String.Empty,DataBase.Connection, null);
@@ -108,42 +169,48 @@ namespace Webtracking.Database
                 oCom.Parameters.Add("EmailSent", MySqlDbType.Int64);
                 oCom.Parameters.Add("Domain", MySqlDbType.String);
                 oCom.Parameters.Add("DynamicField", MySqlDbType.String);
+                oCom.Parameters.Add("OriginalBat", MySqlDbType.LongText);
+                oCom.Parameters.Add("TrackedBat", MySqlDbType.LongText);
+                oCom.Parameters.Add("UpdatedDate", MySqlDbType.DateTime);
                 oCom.Parameters["_id"].Value = _id;
                 oCom.Parameters["Name"].Value = Name;
                 oCom.Parameters["EmailSent"].Value = EmailSent;
                 oCom.Parameters["Domain"].Value = Domain;
                 oCom.Parameters["DynamicField"].Value = DynamicField;
+                oCom.Parameters["OriginalBat"].Value = OriginalBat;
+                oCom.Parameters["TrackedBat"].Value = TrackedBat;
                 if (insertMode)
                 {
                     oCom.Parameters.Add("CreationDate", MySqlDbType.DateTime);
                     oCom.Parameters["CreationDate"].Value = DateTime.Now;
 
-                    oCom.CommandText = "INSERT INTO campaign (_id,Name,EmailSent,Domain,DynamicField,CreationDate,UpdatedDate) VALUES (@_id,@Name, @EmailSent, @Domain, @DynamicField, @CreationDate, @CreationDate);";
+                    oCom.CommandText = "INSERT INTO campaign (_id,Name,EmailSent,Domain,DynamicField,CreationDate,UpdatedDate, OriginalBat, TrackedBat) VALUES (@_id,@Name, @EmailSent, @Domain, @DynamicField, @CreationDate, @CreationDate, @OriginalBat, @TrackedBat);";
                     oCom.ExecuteNonQuery();
                     try {
-                        oCom.CommandText = string.Format("CREATE TABLE `z{0}` ( `Receipient` VARCHAR(300) NOT NULL, `IdCampaign` VARCHAR(300) NOT NULL, `IsOpener` BIT NULL DEFAULT 0, `IsClicker` BIT NULL DEFAULT 0, `IsHardBounce` BIT NULL DEFAULT 0, `IsUnsubscribe` BIT NULL DEFAULT 0, `FirstOpenerDate` DATETIME NULL, `FirstClickerDate` DATETIME NULL, `FirstUnsubscriptionDate` DATETIME NULL, PRIMARY KEY(`Receipient`, IdCampaign));", Name);
+                        oCom.CommandText = string.Format("CREATE TABLE `z{0}` ( `Receipient` VARCHAR(300) NOT NULL, `IdCampaign` VARCHAR(50) NOT NULL, `IsOpener` BIT NULL DEFAULT 0, `IsClicker` BIT NULL DEFAULT 0, `IsHardBounce` BIT NULL DEFAULT 0, `IsUnsubscribe` BIT NULL DEFAULT 0, `FirstOpenerDate` DATETIME NULL, `FirstClickerDate` DATETIME NULL, `FirstUnsubscriptionDate` DATETIME NULL, PRIMARY KEY(`Receipient`, IdCampaign));", Name);
                         oCom.ExecuteNonQuery();
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        //TODO : Manage rollback previous actions
+                        //TODO : Manage rollback previous actions (remove campaign)
+                        throw ex;
                     }
                     try
                     {
-                        oCom.CommandText = string.Format("CREATE TABLE `z{0}link` (`Receipient` VARCHAR(300) NOT NULL, `IdCampaign` VARCHAR(300) NOT NULL, `IdLink` INT NOT NULL,`NbClick` INT NULL DEFAULT 0,`FirstClickDate` BIT NULL DEFAULT 0, PRIMARY KEY(`Receipient`, `IdLink`)); ", Name);
+                        oCom.CommandText = string.Format("CREATE TABLE `z{0}link` (`Receipient` VARCHAR(300) NOT NULL, `IdCampaign` VARCHAR(50) NOT NULL, `IdLink` INT NOT NULL,`NbClick` INT NULL DEFAULT 0,`FirstClickDate` BIT NULL DEFAULT 0, PRIMARY KEY(`Receipient`, `IdLink`)); ", Name);
                         oCom.ExecuteNonQuery();
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        //TODO : Manage rollback previous actions
+                        //TODO : Manage rollback previous actions (remove zTable and campaign)
+                        throw ex;
                     }
                 }
                 else
                 {
-                    oCom.Parameters.Add("UpdatedDate", MySqlDbType.DateTime);
                     oCom.Parameters["UpdatedDate"].Value = DateTime.Now;
 
-                    oCom.CommandText = "UPDATE campaign SET Name=@Name,EmailSent=@EmailSent, UpdatedDate=@UpdatedDate WHERE _id=@_id;";
+                    oCom.CommandText = "UPDATE campaign SET Name=@Name,EmailSent=@EmailSent, UpdatedDate=@UpdatedDate, Domain=@Domain, DynamicField=@DynamicField, OriginalBat=@OriginalBat, TrackedBat=@TrackedBat WHERE _id=@_id;";
                     oCom.ExecuteNonQuery();
                 }
                 success = true;
@@ -155,7 +222,6 @@ namespace Webtracking.Database
             finally
             {
                 oCom.Dispose();
-                oCom = null;
             }
             return success;
         }
@@ -173,7 +239,33 @@ namespace Webtracking.Database
             return oCamp;
         }
 
-        public static string TrackContent(string body, string domain, string dynamicEmailField, bool saveBat, string campaign)
+        public bool Remove()
+        {
+            bool success = false;
+            MySqlCommand oCom = new MySqlCommand(String.Empty, DataBase.Connection, null);
+            try
+            {
+                oCom.Parameters.Add("_id", MySqlDbType.String);
+                oCom.Parameters["_id"].Value = _id;
+                oCom.CommandText = "DELETE FROM campaign WHERE _id=@_id;";
+                oCom.ExecuteNonQuery();
+                oCom.CommandText = string.Format("DROP TABLE `z{0}`;", this.Name);
+                oCom.ExecuteNonQuery();
+                oCom.CommandText = string.Format("DROP TABLE `z{0}link`;", this.Name);
+                oCom.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                success = false;
+            }
+            finally
+            {
+                oCom.Dispose();
+            }
+            return success;
+        }
+
+        public static string TrackContent(string body, string domain, string dynamicEmailField, bool saveBat, string campaign, string oIdCampaign)
         {
             string newcontent = body;
             // Save Original body
@@ -193,15 +285,17 @@ namespace Webtracking.Database
                 System.Collections.Hashtable oNewLink = new System.Collections.Hashtable();
                 foreach (Match oMatsh in Result)
                 {
-
-                    string ext = oMatsh.Value.Substring(oMatsh.Value.Length - 4, 4).ToLower();
+                    string oUrlTempo = Removehref(oMatsh.Value); string ext = oMatsh.Value.Substring(oMatsh.Value.Length - 4, 4).ToLower();
                     if ((ext != ".jpg") && (ext != ".gif") && (ext != ".jepg") && (ext != ".png") && (oMatsh.Value.IndexOf("mailto") < 0) && (oMatsh.Value.IndexOf("file") < 0))
                     {
-                        string oUrlTempo = Removehref(oMatsh.Value);
-                        string newlink = string.Format("http://{0}/{1}/{2}/{3}/", domain, Guid.NewGuid().ToString("d").Substring(1, Middleware.GlobalSetting.GetSettings().CharsOnelink), dynamicEmailField, TrackLink(campaign, oMatsh.Value).ToString());
-                        newcontent.Replace(oUrlTempo, newlink);
-                        oNewLink.Add(oUrlTempo, newlink);
+                        if (!oNewLink.ContainsKey(oUrlTempo))
+                            oNewLink.Add(oUrlTempo, null);
                     }
+                }
+                foreach(string okey in oNewLink.Keys)
+                {
+                    string newlink = string.Format(Middleware.GlobalSetting.GetSettings().LinkBuilModel, domain, Guid.NewGuid().ToString("d").Substring(1, Middleware.GlobalSetting.GetSettings().CharsOnelink), dynamicEmailField, TrackLink(oIdCampaign, okey).ToString());
+                    newcontent = newcontent.Replace(okey, newlink);
                 }
             }
             return newcontent;
@@ -213,11 +307,11 @@ namespace Webtracking.Database
             MySqlCommand oCom = new MySqlCommand(String.Empty, DataBase.Connection, null);
             try
             {
-                oCom.Parameters.Add("campaign", MySqlDbType.String);
+                oCom.Parameters.Add("IdCampaign", MySqlDbType.String);
                 oCom.Parameters.Add("oldLink", MySqlDbType.String);
-                oCom.Parameters["campaign"].Value = campaign;
+                oCom.Parameters["IdCampaign"].Value = campaign;
                 oCom.Parameters["oldLink"].Value = finalLink;
-                oCom.CommandText = "INSERT INTO link (campaign,Link) VALUES (@campaign,@oldLink);SELECT LAST_INSERT_ID();";
+                oCom.CommandText = "INSERT INTO link (IdCampaign,Link) VALUES (@IdCampaign,@oldLink);SELECT LAST_INSERT_ID();";
                 oReturn = Convert.ToInt32(oCom.ExecuteScalar());
             }
             catch (Exception ex)
