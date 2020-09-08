@@ -457,7 +457,7 @@ namespace Webtracking.Database
                 endcontent = string.Concat(endcontent, TagUnsubscribe, TagImg, newcontent.Substring(endbodyposition, (newcontent.Length - (endbodyposition))));
             }
             else
-                endcontent = string.Concat(newcontent, TagUnsubscribe, TagImg, newcontent);
+                endcontent = string.Concat(newcontent, TagUnsubscribe, TagImg);
             return endcontent;
         }
 
