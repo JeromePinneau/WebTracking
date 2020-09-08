@@ -336,7 +336,7 @@ namespace Webtracking.Database
             return success;
         }
 
-        public static bool LogUnsubscribe(string oReceipient, string oIdCampaign)
+        public static bool LogUnsubscribe(string oReceipient, string oIdCampaign=null)
         {
             bool success = true;
             MySqlCommand oCom = new MySqlCommand(String.Empty, DataBase.Connection, null);
@@ -353,6 +353,8 @@ namespace Webtracking.Database
                 if (Convert.ToInt32(oCom.ExecuteScalar()) == 0)
                 {
                     oCom.CommandText = string.Format("UPDATE z{0} SET IsUnsubscribe=1, FirstUnsubscriptionDate=NOW() WHERE Receipient=@Receipient AND IdCampaign=@IdCampaign", oCampaign.Name);
+                    oCom.ExecuteNonQuery();
+                    oCom.CommandText = "INSERT INTO unsubscriptions (Receipient, IdCampaign, Timestamp) VALUES (@Receipient,@IdCampaign,NOW())";
                     oCom.ExecuteNonQuery();
                 }
             }
@@ -448,13 +450,15 @@ namespace Webtracking.Database
             string endcontent = string.Empty;
             int endbodyposition = newcontent.ToLower().IndexOf("</body>");
             // Add img before /body or at the end
+            string TagImg = string.Format("<img src=\"https://{0}/Actions/op/{1}/?key={2}\" />", oCampaign.Domain, oIdCampaign, dynamicEmailField);
+            string TagUnsubscribe = string.Format("<div>To unsubscribe and no longer receive our emails, please use <a href=\"https://{0}/Actions/Unsubscribe/{1}/?key={2}\" > this link</a>.</div>", oCampaign.Domain, oIdCampaign, dynamicEmailField);
             if (endbodyposition > 0)
             {
                 endcontent = newcontent.Substring(0, endbodyposition-1);
-                endcontent = string.Concat(endcontent,string.Format("<img src=\"https://{0}/Actions/op/{1}/?key={2}\" />", oCampaign.Domain, oIdCampaign, dynamicEmailField), newcontent.Substring(endbodyposition, (newcontent.Length - (endbodyposition))));
+                endcontent = string.Concat(endcontent, TagUnsubscribe, TagImg, newcontent.Substring(endbodyposition, (newcontent.Length - (endbodyposition))));
             }
             else
-                endcontent = string.Concat(newcontent, string.Format("<img src=\"https://{0}/Actions/op/{1}/?key={2}\" />", oCampaign.Domain, oIdCampaign, dynamicEmailField), newcontent);
+                endcontent = string.Concat(newcontent, TagUnsubscribe, TagImg, newcontent);
             return endcontent;
         }
 

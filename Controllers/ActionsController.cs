@@ -50,6 +50,21 @@ namespace Webtracking.Controllers
                 _logger.LogError(ex.Message);
                 throw ex;
             }
-}
+        }
+
+        public ActionResult Unsubscribe(string id, string key)
+        {
+            try
+            {
+                Database.Campaign.LogUnsubscribe(key, id);
+                return View();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message);
+                throw ex;
+            }
+            
+        }
     }
 }
