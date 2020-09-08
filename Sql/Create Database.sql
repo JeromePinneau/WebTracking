@@ -25,3 +25,11 @@ CREATE TABLE `link` (
   UNIQUE KEY `_id_UNIQUE` (`_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
+CREATE TABLE `unsubscriptions` (
+  `Receipient` varchar(50) NOT NULL,
+  `IdCampaign` varchar(50) NOT NULL,
+  `Timestamp` datetime NOT NULL,
+  PRIMARY KEY (`Receipient`,`IdCampaign`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+
