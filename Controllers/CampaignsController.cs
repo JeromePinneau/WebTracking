@@ -43,6 +43,7 @@ namespace Webtracking.Controllers
 
         public IActionResult Details(string id)
         {
+            //TODO: Add statistics and details
             return View(new Database.Campaign(new Guid(id)));
         }
 

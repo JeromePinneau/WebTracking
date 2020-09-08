@@ -35,21 +35,9 @@
         <dd class = "col-sm-10">
             @Html.DisplayFor(model => model.EmailSent)
         </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.Domain)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.Domain)
-        </dd>
-        <dt class = "col-sm-2">
-            @Html.DisplayNameFor(model => model.DynamicField)
-        </dt>
-        <dd class = "col-sm-10">
-            @Html.DisplayFor(model => model.DynamicField)
-        </dd>
     </dl>
 </div>
+<div>//TODO: Add statistics and details</div>
 <div>
-    @Html.ActionLink("Edit", "Edit", new { id = Model._id }) |
-    <a asp-action="Index">Back to List</a>
+     <a asp-action="Index" class="btn btn-danger">Back to List</a>
 </div>
