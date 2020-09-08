@@ -10,7 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Webtracking.Database
 {
-
     public class Campaign
     {
         public string _id { get; set; }
@@ -123,11 +122,11 @@ namespace Webtracking.Database
                 if (oReader2.Read())
                 {
                     int NbSent = Convert.ToInt32(oReader["EmailSent"]);
-                    newInstance.Openers = Convert.ToInt32(oReader2["Openers"]);
+                    newInstance.Openers = (oReader2["Openers"] == System.DBNull.Value)?0:Convert.ToInt32(oReader2["Openers"]);
                     newInstance.OpenersRate = (NbSent > 0)?(((float)newInstance.Openers / (float)NbSent) * 100):300;
-                    newInstance.Clickers = Convert.ToInt32(oReader2["Clickers"]);
-                    newInstance.ClickersRate = (newInstance.Openers > 0)?(((float)newInstance.Clickers / (float)newInstance.Openers) * 100):300;
-                    newInstance.Unsubscriptions = Convert.ToInt32(oReader2["Unsubscribe"]);
+                    newInstance.Clickers = (oReader2["Clickers"] == System.DBNull.Value) ? 0 : Convert.ToInt32(oReader2["Clickers"]);
+                    newInstance.ClickersRate = (newInstance.Openers > 0)?(((float)newInstance.Clickers / (float)newInstance.Openers) * 100):0;
+                    newInstance.Unsubscriptions = (oReader2["Unsubscribe"] == System.DBNull.Value) ? 0 : Convert.ToInt32(oReader2["Unsubscribe"]);
                     newInstance.UnsubscriptionsRate = (newInstance.Clickers > 0)?(((float)newInstance.Unsubscriptions / (float)newInstance.Clickers) * 100):0;
                     newInstance.EmailSent = NbSent;
                 }
